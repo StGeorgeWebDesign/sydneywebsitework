@@ -1,0 +1,145 @@
+TITLE:: MOSCion
+summary:: class to respond to the iOS app MOSCion by Op 133 Studios LLC (http://www.op133studios.com).
+categories:: OSC control
+
+DESCRIPTION::
+mOSCion (https://itunes.apple.com/us/app/moscion/id918992600?mt=8) turns your iPhone or iPad into a gestural and environmental sensing device. Information about the device’s motion, surroundings and your touches are converted into data that can be sent with the Open Sound Control (OSC) network protocol to another device that is listening for this information.
+
+
+CLASSMETHODS::
+
+METHOD:: showComputerIP
+Posts your computer iP address and the port that sclang is listening on.
+
+METHOD:: dumpAllOSC
+For debugging, when set to 'true' all incoming OSC messages will be dumped to the post window. Call the method again with 'false' to turn off OSC dumping.
+
+METHOD:: new
+creates a new instance of MOSCion
+
+ARGUMENT:: port
+the port to listen on
+
+ARGUMENT:: baseAddr
+the base of the OSC addr that mOSCion will be sending. Multiple instances of MOSCion can be set up to support multiple devices. Changing the base addr on the device will make message handling easier.
+
+INSTANCEMETHODS::
+
+METHOD:: listen
+listens for the '/pong' message from the mOSCion app. If port is nil, the port from the OSC message will be saved for you, and this instance of MOSCion will filter for messages on this port.
+
+ARGUMENT:: action
+a Function to evaluate when the message comes in
+
+ARGUMENT:: remove
+a boolean that tells the class whether or not to remove this responder when the message comes in.
+
+METHOD:: clearResponders
+removes all responders associated with this instance of MOSCion.
+
+METHOD:: addResponderForAccelerometer
+adds the necessary responders to react to accerlerometer data.
+
+ARGUMENT:: key
+a unique key for this set of responders. Reassigning with the same key will overwrite a previous set of responders.
+
+ARGUMENT:: allFunc
+a function that has the x, y and z values passed into it. This function will be executed with every message received.
+
+ARGUMENT:: xFunc
+a function that has the x value passed into it. This function will be executed with every message received.
+
+ARGUMENT:: yFunc
+a function that has the y value passed into it. This function will be executed with every message received.
+
+ARGUMENT:: zFunc
+a function that has the z value passed into it. This function will be executed with every message received.
+
+METHOD:: removeAccelerometerResponder
+removes a set of responders with the key id.
+
+ARGUMENT:: key
+the key to search for.
+
+METHOD:: addResponderForGyroscope
+METHOD:: addResponderForMagnetometer
+see accelerometer details above.
+
+METHOD:: addResponderForAttitude
+similar to accelerometer, except the functions are for all controls, pitch, yaw and roll.
+
+METHOD:: addResponderForSpeed
+similar to accelerometer, except the functions are for all controls, speed (in meters/sec) and course.
+
+METHOD:: addResponderForHeading
+similar to accelerometer, except the functions are for all controls, true heading and magnetic heading.
+
+METHOD:: addResponderForGPS
+similar to accelerometer, except the functions are for all controls, latitude, longitude and altitude
+
+METHOD:: addResponderForMicrophone
+similar to accelerometer, except the functions are for all controls, linear amplitude, frequency and a floating point midi keynum
+
+METHOD:: addRespondersForTouch
+ARGUMENT:: key
+a unique key for this set of responders. Reassigning with the same key will overwrite a previous set of responders.
+
+ARGUMENT:: touchBeganFunc
+ARGUMENT:: touchMovedFunc
+ARGUMENT:: touchEndedFunc
+methods to respond to touch began, move and ended. All functions are passed a unique integer touch ID (to track touches with) and current x and y position.
+
+METHOD:: removeGyroscopeResponder
+METHOD:: removeMagnetometerResponder
+METHOD:: removeAttitudeResponder
+METHOD:: removeSpeedResponder
+METHOD:: removeHeadingResponder
+METHOD:: removeGPSResponder
+METHOD:: removeMicrophoneResponder
+METHOD:: removeTouchResponders
+similar to the method for removing accelerometer responders
+
+METHOD:: clearAllTouches
+sends the touch end for all current tracked touches. Touches on the device are sometimes lost, and this helps clear out stuck touches.
+
+
+EXAMPLES::
+
+code::
+m = MOSCion.new;
+
+// send pong from MOSCion to filter only this port
+m.listen(nil, true);
+
+MOSCion.showComputerIP;
+MOSCion.dumpAllOSC;
+MOSCion.dumpAllOSC(false);
+
+s.boot;
+
+SynthDef(\test, {arg freq, offset;
+	var out;
+	out = Pluck.ar(PinkNoise.ar.dup, Impulse.kr(0), 0.2, (freq * Lag2.kr(offset, 0.4)).reciprocal, 4, 0.03);
+	DetectSilence.ar(out , doneAction: 2);
+	Out.ar(0, out);
+}).add;
+
+g = Group.new;
+
+// turn on Attitude in MOSCion- adjusting pitch of the device will update the p variable and any current notes
+p = 0;
+m.addResponderForAttitude(\test, {arg pitch;
+	p = pitch;
+	g.set(\offset, (p*7).midiratio)}, nil, nil, nil);
+
+
+// touches start new notes.
+
+m.addRespondersForTouch(\test, {arg id, x, y;
+	id.postln;
+	Synth(\test, [\freq, 800, \amp, y, \offset, (p*7).midiratio], g);
+}, nil, nil);
+
+// clean up
+m.clearResponders;
+::
