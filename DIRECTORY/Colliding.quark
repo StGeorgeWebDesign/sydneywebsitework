@@ -5,7 +5,7 @@
 \author: "Gerard Roma",
 \organization:  "",
 \version: 0.7,
-\dependencies: [TabbedView2,Freesound2],
+\dependencies: ["TabbedView2","Freesound2"],
 \ext_dependancy: "curl",
 \helpdoc:	""
 )
