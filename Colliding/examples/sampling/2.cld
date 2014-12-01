@@ -1,0 +1,5 @@
+var pb = PlayBuf.ar(1,0, BufRateScale.kr(0), loop:1);
+var mx =  MouseX.kr(0, SampleRate.ir);
+var my = MouseY.kr(0, 31);
+var dec = Decimator.ar(pb, mx, my);
+Out.ar(0,dec!2);

@@ -1,0 +1,5 @@
+var brs = BufRateScale.kr(0);
+var bf = BufFrames.kr(0);
+var lfn = LFNoise1.ar(1);
+var brd = BufRd.ar(1, 0, 0.2*lfn*bf);
+Out.ar(0,brd!2);

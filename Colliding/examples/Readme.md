@@ -1,0 +1,1 @@
+To load these examples click "⇈" and select one of the .cld files. Some of the examples (additive, fm, subtractive) are thought for using the qwerty keyboard.

@@ -1,0 +1,5 @@
+// do not use Qwerty for these, no envelope
+var mx = MouseX.kr(0,2);
+var rate = mx*BufRateScale.kr(0);
+var pb = PlayBuf.ar(1,0, rate, loop:1);
+Out.ar(0,pb!2);
