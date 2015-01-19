@@ -1,0 +1,162 @@
+TITLE:: VoicerMIDISocket
+summary:: Directs note-on/off messages to a Voicer object
+categories:: External Control>MIDI
+related:: Classes/AbstractMIDISocket, Classes/Voicer, Guides/ddwMIDI_Guide
+
+DESCRIPTION::
+VoicerMIDISocket makes it convenient to play a link::Classes/Voicer:: by MIDI keyboard.
+
+There is a strict division of labor:
+
+list::
+## link::Classes/Voicer:: handles all interaction with the server. It provides the programmatic interface to trigger and release notes (using frequency as the note ID), and manage "global controls" (e.g., a filter frequency that should always be the same across all notes).
+## VoicerMIDISocket receives MIDI messages and uses Voicer's programmatic interface to play the notes. It also includes convenience methods to attach the Voicer's global controls to link::Classes/VoicerMIDIController:: responders.
+::
+
+See the link::#Examples:: for some typical use cases.
+
+
+CLASSMETHODS::
+
+METHOD:: new
+Create a new instance. Arguments are:
+
+Definitionlist::
+## chan || The messages' source. See link::Guides/ddwMIDI_Guide#Identifying MIDI channels::.
+## lo || The lowest MIDI note to which this socket will respond.
+## hi || The highest MIDI note to which this socket will respond.
+## noteOnPat || See link::#-noteOnArgsPat::.
+## midi2Freq || A custom function to translate MIDI note number into frequency. If not provided, the default function will be used; see link::#*defaultMidiToFreq::.
+::
+
+returns:: The socket instance.
+
+
+METHOD:: defaultMidiToFreq
+The default function to convert the incoming MIDI note number into frequency (Hz). During library initialization, this is assigned code::_.midicps::. You may change this function at any time, and it will apply to any new VoicerMIDISockets created in the future. It does not retroactively alter existing sockets.
+
+This function must be deterministic. link::Classes/Voicer:: will fail to release notes correctly if this function returns different frequencies for the same note number.
+
+PRIVATE:: initClass
+
+
+INSTANCEMETHODS::
+
+COPYMETHOD:: AbstractMIDISocket -free
+
+METHOD:: panic
+Calls the target Voicer's link::Classes/Voicer#-panic#panic:: method, shutting off all notes. Purely a convenience.
+
+
+Subsection:: Member variables
+
+METHOD:: lowkey
+The lowest MIDI note to which this socket will respond. With code::hikey::, this variable supports keyboard splits by creating multiple VoicerMIDISockets on the same channel, with different key ranges.
+
+
+METHOD:: hikey
+The highest MIDI note to which this socket will respond.
+
+
+METHOD:: transpose
+A number of semitones to add to the note number, before converting to frequency. May be fractional, in which case it also serves as a tuning parameter.
+
+
+METHOD:: midiToFreq
+A custom function to translate MIDI note number into frequency. See link::#*defaultMidiToFreq::.
+
+
+METHOD:: noteOnArgsPat
+An emphasis::event pattern:: (e.g., link::Classes/Pbind::) providing additional argument values to the Voicer. The pattern can access note number and velocity by code::Pkey(\midinote):: and code::Pkey(\velocity)::, respectively. All key-value pairs in the pattern's output events will be passed to the Voicer as note-onset synth arguments. Uses:
+
+list::
+## Map note number or velocity onto Voicer synth parameters.
+## Randomize, or otherwise algorithmically generate, parameter values per note. For example, each note could play at a random pan position.
+::
+
+code::
+// assuming 'k' is a VoicerMIDISocket,
+// map velocity onto amp, and randomize 'pan'
+
+k.noteOnArgsPat = Pbind(
+	\amp, Pkey(\velocity).linlin(0, 127, 0.05, 0.25),
+	\pan, Pwhite(-1.0, 1.0, inf)
+);
+::
+
+METHOD:: noteOnArgsEvent
+An link::Classes/Event:: containing default values to provide to code::noteOnArgsPat::.
+
+
+Subsection:: Global controls
+
+
+METHOD:: addControl
+(describe method here)
+
+ARGUMENT:: ccnum
+(describe argument here)
+
+ARGUMENT:: name
+(describe argument here)
+
+ARGUMENT:: value
+(describe argument here)
+
+ARGUMENT:: spec
+(describe argument here)
+
+ARGUMENT:: overrideChan
+(describe argument here)
+
+returns:: (describe returnvalue here)
+
+
+METHOD:: removeControl
+(describe method here)
+
+ARGUMENT:: control
+(describe argument here)
+
+returns:: (describe returnvalue here)
+
+
+METHOD:: searchControl
+(describe method here)
+
+ARGUMENT:: control
+(describe argument here)
+
+returns:: (describe returnvalue here)
+
+
+METHOD:: ccs
+(describe method here)
+
+returns:: (describe returnvalue here)
+
+METHOD:: searchControlNum
+(describe method here)
+
+ARGUMENT:: control
+(describe argument here)
+
+returns:: (describe returnvalue here)
+
+Subsection:: General/inherited methods
+
+COPYMETHOD:: AbstractMIDISocket -parent
+COPYMETHOD:: AbstractMIDISocket -enable
+COPYMETHOD:: AbstractMIDISocket -disable
+COPYMETHOD:: BasicMIDISocket -active
+COPYMETHOD:: AbstractMIDISocket -clear
+COPYMETHOD:: BasicMIDISocket -noteOn
+COPYMETHOD:: BasicMIDISocket -noteOff
+
+PRIVATE:: init, active, clear, noteOff, noteOn
+
+EXAMPLES::
+
+code::
+(some example code)
+::
