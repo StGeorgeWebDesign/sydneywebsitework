@@ -65,12 +65,14 @@ GuidoScore : GuidoObj {
 		}
 
 	output {arg pathname, mode = "w";
-		var string, eventstring;
+		var string, eventstring, scoreCopy;
 		file = File.new(pathname, mode);
 		file.write("%% SuperCollider output from " ++ Date.localtime ++ "\n");
 		file.write("%% Comments (%) after musical objects denote measure, beat (if supplied) \n");
 		file.write("{\n");
-		score.do({arg me, i;
+		scoreCopy = score.deepCopy;
+		scoreCopy = scoreCopy.sort({arg a, b; a.id < b.id});
+		scoreCopy.do({arg me, i;
 			file.write("%%Voice" ++ i ++ "\n");
 			me.output(file);
 			(i != (score.size - 1)).if({file.write(",")});
@@ -93,6 +95,7 @@ key can be an integer. 0 is no sharps or flats, -2 is 2 flats, 3 is 3 sharps OR:
 
 GuidoPart : GuidoObj {
 	var <>id, <instr, <>events, <>stemdir, <>staffid, <>clef, <>key, <>timeSig;
+	var <>header, <>spacing; // a GUIDO string to place at the head of the section
 	// GuidoPart Objects will be an array Array of GuidoEvents
 	*new {arg id, instr, events, clef, key, timeSig, stemdir = \stemsAuto, staffid;
 		staffid = staffid ?? {id};
@@ -123,10 +126,17 @@ GuidoPart : GuidoObj {
 	output {arg file;
 		var string, eventstring, initMeter, currentMeter, currentMeasure, theseevents;
 		file.write("[\n");
-		file.write("\\staff<\""++staffid.asString++"\"> ");
-		instr.notNil.if({file.write("\\instr<\""++instr.asString++"\"> ")});
+		header.notNil.if({
+			file.write("\t"++header++" %% header \n");
+		});
+		spacing.notNil.if({
+			file.write("\t\\staff<id="++staffid++",dy="++spacing++"pt> \n");
+		}, {
+			file.write("\t\\staff<id="++staffid++"> \n");
+		});
+		instr.notNil.if({file.write("\t\\instr<\""++instr.asString++"\"> \n")});
 		currentMeasure = 1;
-		file.write("\\"++stemdir.asString++" \n");
+		file.write("\t\\"++stemdir.asString++" \n");
 		events.do{arg me; me.output(file)};
 		file.write("]\n");
 		}
@@ -158,36 +168,35 @@ GuidoEvent : GuidoObj {
 	*initClass {
 		rhythmToDur = IdentityDictionary[
 			\q -> 0.25,
-			\qd -> 0.25,
-			\qdd -> 0.25,
+			\qd -> (0.25 * 1.5),
+			\qdd -> (0.25 * 1.75),
 			\e -> 0.125,
-			\ed -> 0.125,
-			\edd -> 0.125,
+			\ed -> (0.125 * 1.5),
+			\edd -> (0.125 * 1.75),
 			\s -> 0.0625,
-			\sd -> 0.0625,
-			\sdd -> 0.0625,
+			\sd -> (0.0625 * 1.5),
+			\sdd -> (0.0625 * 1.75),
 			\t -> 0.03125,
-			\td -> 0.03125,
-			\tdd -> 0.03125,
+			\td -> (0.03125 * 1.5),
+			\tdd -> (0.03125 * 1.75),
 			\x -> 0.015625,
-			\xd -> 0.015625,
-			\xdd -> 0.015625,
+			\xd -> (0.015625 * 1.5),
+			\xdd -> (0.015625 * 1.75),
 			\o -> 0.0078125,
-			\od -> 0.0078125,
-			\odd -> 0.0078125,
+			\od -> (0.0078125 * 1.5),
+			\odd -> (0.0078125 * 1.75),
 			\h -> 0.5,
-			\hd -> 0.5,
-			\hdd -> 0.5,
+			\hd -> (0.5 * 1.5),
+			\hdd -> (0.5 * 1.75),
 			\w -> 1.0,
-			\wd -> 1.0,
-			\wdd -> 1.0,
+			\wd -> (1.0 * 1.5),
+			\wdd -> (1.0 * 1.75),
 			\b -> 2.0,
-			\bd -> 2.0,
-			\bdd -> 2.0,
+			\bd -> (2.0 * 1.5),
+			\bdd -> (2.0 * 1.75),
 			\l -> 4.0,
-			\ld -> 4.0,
-			\ldd -> 4.0
-			];
+			\ld -> (4.0 * 1.5),
+			\ldd -> (4.0 * 1.75)];
 		timeToDots = IdentityDictionary[
 			0.25 -> 0,
 			0.375 -> 1,
@@ -258,12 +267,14 @@ GuidoEvent : GuidoObj {
 
 // aPitchClass should be an instance of PitchClass or an integer keynum
 GuidoNote : GuidoEvent {
-	var <note, <>duration, <>marks, chord, <>tie;
+	var <note, <>duration, <>marks, chord, <>tie, <noteHead, <graceNotes, <>startSlur, <>endSlur;
 	*new {arg aPitchClass = 60, duration = 0.25, marks;
 		^super.new.initGuidoNote(aPitchClass, duration, marks.asArray);
 		}
 
 	initGuidoNote {arg argNote, argDur, argMarks;
+		startSlur = false;
+		endSlur = false;
 		duration = argDur;
 		marks = argMarks;
 		chord = false;
@@ -279,13 +290,64 @@ GuidoNote : GuidoEvent {
 			});
 		}
 
-	addDynamic {arg dynamic;
-		marks = marks.add(GuidoDynamic(\i, dynamic))
+	addDynamic {arg tag, dynamic;
+		marks = marks.add(GuidoDynamic(tag, dynamic))
 		}
 
 	addArticulation {arg articulation;
-		marks = marks.add(GuidoArticulation(articulation))
+		marks = marks.add(GuidoArticulation(articulation));
 		}
+
+	addGraceNotes {arg ... notes;
+		graceNotes = notes;
+	}
+	/*
+
+\normalHead
+\slashHead
+\filledTriHead
+\openTriHead
+\filledSquareHead
+\openSquareHead
+\filledDiaHead
+\openDiaHead
+\crossHead
+\xHead
+\circleHead
+\circleXHead
+\noHead
+\stemPos
+\arrowUpHead
+\arrowDownHead
+
+	*/
+	useNoteHead {arg noteHeadToUse;
+		(noteHeadToUse == \diamond).if({
+			(duration.isNil || (duration < 0.5)).if({
+				noteHead = GuidoNoteHead(\filledDiaHead);
+			}, {
+				noteHead = GuidoNoteHead(\openDiaHead);
+			});
+		});
+		(noteHeadToUse == \triangle).if({
+			(duration < 0.5).if({
+				noteHead = GuidoNoteHead(\filledTriHead);
+			}, {
+				noteHead = GuidoNoteHead(\openTriHead);
+			});
+		});
+		(noteHeadToUse == \square).if({
+			(duration < 0.5).if({
+				noteHead = GuidoNoteHead(\filledSquareHead);
+			}, {
+				noteHead = GuidoNoteHead(\openSquareHead);
+			});
+		});
+		// if the above hasn't found it, create one from the symbol passed in
+		noteHead.isNil.if({
+			noteHead = GuidoNoteHead((noteHeadToUse ++ "Head").asSymbol);
+		});
+	}
 
 	convertToPC {arg aPitchClass;
 		var rem;
@@ -304,8 +366,24 @@ GuidoNote : GuidoEvent {
 		}
 
 	outputString {
-		var string, markstring, articulation = 0, noteStr, rhyString;
+		var string, markstring, articulation = 0, noteStr, rhyString, noteHeadStr, graceStr;
+		var slurStartString, slurEndString;
 		var rhythm = this.calcRhyDur(duration);
+		noteHeadStr = "";
+		noteHead.notNil.if({
+			noteHeadStr = noteHead.outputString;
+		});
+		graceNotes.notNil.if({
+			graceStr = "\\grace(";
+			graceNotes.do({arg thisNote;
+				graceStr = graceStr ++ " " ++ thisNote.outputString ++ " ";
+			});
+			graceStr = graceStr ++ " )";
+		}, {
+			graceStr = "";
+		});
+
+
 		rhyString = "*"++rhythm[0]++"/"++rhythm[1];
 		markstring = "";
 		marks.do({arg me; me.isKindOf(GuidoArticulation).if({articulation = articulation + 1})});
@@ -319,14 +397,14 @@ GuidoNote : GuidoEvent {
 			(i > 0).if({
 				noteStr = noteStr ++ ", ";
 				});
-			noteStr = noteStr ++ me.alt1 ++ me.guidoString ++ rhyString ++ me.alt2;
+			noteStr = noteHeadStr ++ noteStr ++ me.alt1 ++ me.guidoString ++ rhyString ++ me.alt2;
 			});
 		chord.if({
 			noteStr = "{"++noteStr++"}";
 			});
-
-		string = markstring ++ noteStr;
+		string = graceStr ++ markstring ++ noteStr;
 		articulation.do({string = string ++" )"});
+		//noteHead.notNil.if({string = string ++ " )"});
 		tie.notNil.if({
 			// tie can equal \start or \end
 			(tie == \start).if({
@@ -335,6 +413,9 @@ GuidoNote : GuidoEvent {
 				string = string ++ ")";
 				});
 			});
+		slurStartString = startSlur.if({"\\slurBegin "}, {""});
+		slurEndString = endSlur.if({"\\slurEnd "}, {""});
+		string = slurStartString ++ string ++ slurEndString;
 		^"\t"++string;
 		}
 	}
@@ -541,7 +622,7 @@ e.g. 32 = 32nd notes
 GuidoArticulation : GuidoMark {
 	var tag, val;
 	*new {arg tag, val;
-		([\stacc, \accent, \ten, \marcato, \trem, \grace, \alter].indexOf(tag).notNil).if({
+		([\stacc, \accent, \ten, \marcato, \trem, \grace, \alter, \harmonic].indexOf(tag).notNil).if({
 			^super.newCopyArgs(tag, val);
 			}, {
 			"Tag not recognized as a GuidoArticulation".warn;
@@ -564,6 +645,25 @@ GuidoArt {
 		}
 	}
 
+GuidoNoteHead : GuidoMark {
+	var tag, val;
+	*new {arg tag, val;
+		([\normalHead, \slashHead, \filledTriHead, \openTriHead,
+			\filledSquareHead, \openSquareHead, \filledDiaHead,
+			\openDiaHead,\crossHead,\xHead,\circleHead,
+			\circleXHead,\noHead,\stemPos,\arrowUpHead,
+			\arrowDownHead].indexOf(tag).notNil).if({
+			^super.newCopyArgs(tag, val);
+			}, {
+			"Tag not recognized as a GuidoNoteHead".warn;
+			^nil;
+			})
+		}
+
+	outputString {
+		^"\\"++tag.asString++" ";
+	}
+}
 // maps out timesigs over measures: pass in an array of arrays:
 // [ [measure, [beats, div]], [measure, [beats, div]] ]
 // if a measure is left out, the previous measures timesig will be used
